@@ -3,7 +3,7 @@ import numpy as np
 
 
 class ReplayBuffer:
-    def __init__(self, buffer_size, batch_size):
+    def __init__(self, buffer_size, batch_size,num_agent):
         self.replay_buffer = []
         self.max_size = buffer_size
         self.batch_size = batch_size

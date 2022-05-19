@@ -8,8 +8,7 @@ from torch.distributions import Categorical
 import os
 import yaml
 
-device = torch.device("cuda:1") if torch.cuda.is_available() else torch.device("cpu")
-
+device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
 
 def hard_update(source, target):
     target.load_state_dict(source.state_dict())
@@ -121,7 +120,8 @@ def get_observations(state, agents_index, obs_dim, height, width):
     observations = np.zeros((3, obs_dim))
     snakes_position = np.array(snakes_positions_list, dtype=object)
     beans_position = np.array(beans_positions, dtype=object).flatten()
-    for i in agents_index:
+    for k in agents_index:
+        i = k % 3
         # self head position
         observations[i][:2] = snakes_position[i][0][:]
 
@@ -141,29 +141,61 @@ def get_observations(state, agents_index, obs_dim, height, width):
     return observations
 
 
-def get_reward(info, snake_index, reward, score):
+def get_reward(info, snake_index, reward,episode_reward, score,step):
     snakes_position = np.array(info['snakes_position'], dtype=object)
     beans_position = np.array(info['beans_position'], dtype=object)
     snake_heads = [snake[0] for snake in snakes_position]
     step_reward = np.zeros(len(snake_index))
-    for i in snake_index:
+    for k in snake_index:
+        i = k%3
         if score == 1:
-            step_reward[i] += 50
+            if sum(episode_reward)>35:
+                step_reward[i] += 1000
+            elif sum(episode_reward) > 23:
+                step_reward[i] += 500
+            elif sum(episode_reward) < 12:
+                step_reward[i] -= 300
+            elif sum(episode_reward) < 5:
+                step_reward[i] -= 500
+            else:
+                #step_reward[i] += 80
+                step_reward[i] += 200
         elif score == 2:
-            step_reward[i] -= 25
+            if sum(episode_reward) < 3:
+                step_reward[i] -= 1000
+            elif sum(episode_reward) < 10:
+                step_reward[i] -= 500
+            else:
+                #step_reward[i] -= 25
+                step_reward[i] -= 100
         elif score == 3:
-            step_reward[i] += 10
+            if sum(episode_reward)>25:
+                step_reward[i] += 100
+            elif sum(episode_reward) > 15:
+                step_reward[i] += 40
+            elif sum(episode_reward) < 7 and step > 50:
+                step_reward[i] -= 10
+            else:
+                step_reward[i] += 10
         elif score == 4:
-            step_reward[i] -= 5
-
+            if sum(episode_reward)<9 and step>10:
+                step_reward[i] -=50
+            elif sum(episode_reward)<17 and step>170:
+                step_reward[i] -=20
+            else:
+                step_reward[i] -= 5
+#--load_model_run=16 --load_model_run_episode=3000 --load_model
         if reward[i] > 0:
-            step_reward[i] += 20
+            step_reward[i] += 70
         else:
             self_head = np.array(snake_heads[i])
             dists = [np.sqrt(np.sum(np.square(other_head - self_head))) for other_head in beans_position]
-            step_reward[i] -= min(dists)
+            dist2 =  [np.sqrt(np.sum(np.square(other_head - self_head))) for other_head in snake_heads]
+            step_reward[i] -= 5*min(dists) - 3*np.sort(dist2)[1]
+            #print(np.sort(dist2)[1])
             if reward[i] < 0:
-                step_reward[i] -= 10
+                step_reward[i] -= 100
+
 
     return step_reward
 
@@ -177,7 +209,7 @@ def logits_random(act_dim, logits):
     return actions
 
 
-def logits_greedy(state, logits, height, width):
+def logits_greedy(state, logits,logits2, height, width,step):
     state_copy = state.copy()
     board_width = state_copy['board_width']
     board_height = state_copy['board_height']
@@ -201,12 +233,16 @@ def logits_greedy(state, logits, height, width):
     logits = torch.Tensor(logits).to(device)
     logits_action = np.array([Categorical(out).sample().item() for out in logits])
 
-    greedy_action = greedy_snake(state, beans, snakes, width, height, [3, 4, 5])
+    logits2 = torch.Tensor(logits2).to(device)
+    logits_action2 = np.array([Categorical(out2).sample().item() for out2 in logits2])
 
+    # greedy_action1 = greedy_snake(state, beans, snakes, width, height, [0, 1, 2])
+    # greedy_action2 = greedy_snake(state, beans, snakes, width, height, [3, 4, 5])
     action_list = np.zeros(6)
-    action_list[:3] = logits_action
-    action_list[3:] = greedy_action
 
+    action_list[:3] = logits_action
+    #action_list[3:] = greedy_action2
+    action_list[3:] = logits_action2
     return action_list
 
 

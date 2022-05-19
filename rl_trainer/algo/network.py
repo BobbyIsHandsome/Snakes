@@ -8,7 +8,7 @@ HIDDEN_SIZE = 256
 
 
 class Actor(nn.Module):
-    def __init__(self, obs_dim, act_dim, num_agents, args, output_activation='tanh'):
+    def __init__(self, obs_dim, act_dim, num_agents, args,idx, output_activation='tanh'):
         super().__init__()
         self.obs_dim = obs_dim
         self.act_dim = act_dim
@@ -42,7 +42,7 @@ class Actor(nn.Module):
 
 
 class Critic(nn.Module):
-    def __init__(self, obs_dim, act_dim, num_agents, args):
+    def __init__(self, obs_dim, act_dim, num_agents, args,idx):
         super().__init__()
 
         self.obs_dim = obs_dim
